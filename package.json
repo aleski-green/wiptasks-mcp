@@ -1,0 +1,13 @@
+{
+  "name": "wiptasks-mcp",
+  "version": "1.0.0",
+  "description": "Remote MCP server for wiptasks management",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "express": "^4.21.0"
+  }
+}
