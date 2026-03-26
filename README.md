@@ -98,6 +98,7 @@ In your Railway dashboard, go to your service > **Variables** and add:
 | `SUPABASE_URL` | Your Supabase project URL (e.g. `https://abcdef.supabase.co`) |
 | `SUPABASE_KEY` | Your Supabase **service_role** key (found in Settings > API) |
 | `MCP_SECRET` | A random secret for bearer auth (see Step 6) |
+| `SERVER_URL` | Your Railway public URL (e.g. `https://your-app.up.railway.app`) — required for OAuth |
 
 ### Step 6: Generate your MCP_SECRET
 
@@ -111,17 +112,16 @@ Copy the output and set it as `MCP_SECRET` in Railway. You'll also use this valu
 
 After deploying, Railway gives you a public URL (e.g. `https://your-app.up.railway.app`). Use that URL + your `MCP_SECRET` to connect.
 
-#### Claude Web App
+#### Claude Web App (OAuth)
 
 1. Go to **Settings** > **Connectors**
 2. Click **Add Connector**
 3. Fill in:
    - **Name:** `WipTasksMCP`
    - **URL:** `https://<your-railway-url>/mcp`
-   - **Authentication type:** Custom Header
-   - **Header name:** `Authorization`
-   - **Header value:** `Bearer <your-MCP_SECRET>`
-4. Save
+4. Click **Add** — Claude will open an authorization page
+5. Enter your `MCP_SECRET` and click **Authorize**
+6. Done — the connector is now authenticated via OAuth
 
 #### Claude Code
 
@@ -163,7 +163,13 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ## Authentication
 
-All `/mcp` routes require a bearer token via the `Authorization` header. Requests without a valid token receive `401 Unauthorized`. The `/health` endpoint is open.
+The server supports two authentication methods:
+
+1. **OAuth 2.1** (Claude Web App) — Authorization Code + PKCE flow. The server acts as its own OAuth provider. When connecting via the web app, you'll be redirected to a login page where you enter your `MCP_SECRET`.
+
+2. **Bearer token** (Claude Code / Desktop) — Simple `Authorization: Bearer <MCP_SECRET>` header. Configure in `.mcp.json` or `claude_desktop_config.json`.
+
+Both methods protect all `/mcp` routes. The `/health` endpoint is open. OAuth endpoints (`/.well-known/oauth-authorization-server`, `/authorize`, `/token`, `/register`) are also open by design.
 
 ## Task Schema
 
