@@ -1,10 +1,23 @@
 # WipTasks MCP Server
 
-Remote MCP (Model Context Protocol) server for managing WipTasks — a task management system backed by Supabase.
+Remote MCP (Model Context Protocol) server for managing tasks — backed by Supabase, deployed on Railway, connected to Claude.
 
-## What is this?
+## Architecture
 
-This MCP server gives AI agents (Claude, etc.) direct access to your WipTasks database. Agents can create, read, update, complete, and archive tasks without needing to interact with any UI.
+```
+Claude (Web / Desktop / Code)
+  |
+  | MCP protocol (HTTP + bearer auth)
+  v
+MCP Server (Railway / Node.js)
+  |
+  | HTTP + service_role key
+  v
+Edge Function (Supabase)
+  |
+  v
+PostgreSQL (Supabase)
+```
 
 ## Available Tools
 
@@ -18,6 +31,139 @@ This MCP server gives AI agents (Claude, etc.) direct access to your WipTasks da
 | `update_task` | Update any fields on a task |
 | `complete_task` | Mark a task as completed |
 | `archive_task` | Archive a task |
+
+## Setup Guide
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) 20+
+- [Supabase](https://supabase.com/) account (free tier works)
+- [Railway](https://railway.app/) account (free tier works)
+- [Supabase CLI](https://supabase.com/docs/guides/cli) (for deploying the edge function)
+
+### Step 1: Create a Supabase project
+
+1. Go to [supabase.com/dashboard](https://supabase.com/dashboard)
+2. Click **New Project**
+3. Pick a name, set a database password, choose a region
+4. Wait for the project to initialize
+
+### Step 2: Run the SQL migration
+
+1. In your Supabase dashboard, go to **SQL Editor**
+2. Paste the contents of [`supabase/migrations/001_create_wiptasks.sql`](supabase/migrations/001_create_wiptasks.sql)
+3. Click **Run**
+
+This creates the `wiptasks` table with all columns, constraints, and RLS policies.
+
+### Step 3: Deploy the edge function
+
+```bash
+# Login to Supabase CLI
+supabase login
+
+# Link to your project (find your project ref in the Supabase dashboard URL)
+supabase link --project-ref <your-project-ref>
+
+# Deploy the edge function
+supabase functions deploy wiptasks-api --no-verify-jwt
+```
+
+The `--no-verify-jwt` flag is needed because the MCP server authenticates with the service role key directly.
+
+### Step 4: Deploy the MCP server to Railway
+
+```bash
+# Install Railway CLI
+npm install -g @railway/cli
+
+# Login
+railway login
+
+# Create a new project
+railway init
+
+# Deploy
+railway up
+```
+
+Or deploy via Docker — the repo includes a `Dockerfile`.
+
+### Step 5: Set environment variables
+
+In your Railway dashboard, go to your service > **Variables** and add:
+
+| Variable | Value |
+|----------|-------|
+| `SUPABASE_URL` | Your Supabase project URL (e.g. `https://abcdef.supabase.co`) |
+| `SUPABASE_KEY` | Your Supabase **service_role** key (found in Settings > API) |
+| `MCP_SECRET` | A random secret for bearer auth (see Step 6) |
+
+### Step 6: Generate your MCP_SECRET
+
+```bash
+openssl rand -hex 32
+```
+
+Copy the output and set it as `MCP_SECRET` in Railway. You'll also use this value when connecting Claude.
+
+### Step 7: Connect to Claude
+
+After deploying, Railway gives you a public URL (e.g. `https://your-app.up.railway.app`). Use that URL + your `MCP_SECRET` to connect.
+
+#### Claude Web App
+
+1. Go to **Settings** > **Connectors**
+2. Click **Add Connector**
+3. Fill in:
+   - **Name:** `WipTasksMCP`
+   - **URL:** `https://<your-railway-url>/mcp`
+   - **Authentication type:** Custom Header
+   - **Header name:** `Authorization`
+   - **Header value:** `Bearer <your-MCP_SECRET>`
+4. Save
+
+#### Claude Code
+
+Add to `.mcp.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "wiptasks": {
+      "type": "url",
+      "url": "https://<your-railway-url>/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-MCP_SECRET>"
+      }
+    }
+  }
+}
+```
+
+Then restart Claude Code.
+
+#### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "wiptasks": {
+      "type": "url",
+      "url": "https://<your-railway-url>/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-MCP_SECRET>"
+      }
+    }
+  }
+}
+```
+
+## Authentication
+
+All `/mcp` routes require a bearer token via the `Authorization` header. Requests without a valid token receive `401 Unauthorized`. The `/health` endpoint is open.
 
 ## Task Schema
 
@@ -38,82 +184,37 @@ This MCP server gives AI agents (Claude, etc.) direct access to your WipTasks da
 | `created_at` | timestamp | Auto-set on creation |
 | `updated_at` | timestamp | Auto-updated on changes |
 
-## Authentication
+## Local Development
 
-All `/mcp` requests require a bearer token. Set `MCP_SECRET` as an environment variable on your server, then pass it in the `Authorization` header:
+```bash
+# Clone the repo
+git clone https://github.com/<your-username>/wiptasks-mcp.git
+cd wiptasks-mcp
 
-```
-Authorization: Bearer <your-MCP_SECRET>
-```
+# Install dependencies
+npm install
 
-Requests without a valid token receive `401 Unauthorized`. The `/health` endpoint remains open.
+# Copy env template and fill in your values
+cp .env.example .env
 
-## Connect to Claude Web App
-
-1. Go to **Settings** > **Connectors**
-2. Click **Add Connector**
-3. Fill in:
-   - **Name:** `WipTasksMCP`
-   - **URL:** `https://<your-railway-url>/mcp`
-   - **Authentication type:** Custom Header
-   - **Header name:** `Authorization`
-   - **Header value:** `Bearer <your-MCP_SECRET>`
-4. Save
-
-## Connect to Claude Code
-
-Add to `.mcp.json` in your project root:
-
-```json
-{
-  "mcpServers": {
-    "wiptasks": {
-      "type": "url",
-      "url": "https://<your-railway-url>/mcp",
-      "headers": {
-        "Authorization": "Bearer <your-MCP_SECRET>"
-      }
-    }
-  }
-}
+# Start the server
+node index.js
 ```
 
-Then restart Claude Code. The wiptasks tools will be available automatically.
+The server runs on `http://localhost:3000`. Test it:
 
-## Connect to Claude Desktop
+```bash
+# Health check
+curl http://localhost:3000/health
 
-Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "wiptasks": {
-      "type": "url",
-      "url": "https://<your-railway-url>/mcp",
-      "headers": {
-        "Authorization": "Bearer <your-MCP_SECRET>"
-      }
-    }
-  }
-}
+# Authenticated MCP request
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Authorization: Bearer <your-MCP_SECRET>" \
+  -d '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
 ```
 
-## Self-Hosting
+## License
 
-1. Clone the repo
-2. Set environment variables:
-   - `SUPABASE_URL` — your Supabase project URL
-   - `SUPABASE_KEY` — your Supabase anon or service_role key
-   - `MCP_SECRET` — a random secret string for bearer auth
-   - `PORT` — server port (default: 3000)
-3. `npm install && npm start`
-
-Deploy anywhere that runs Node.js (Railway, Fly.io, Render, etc.).
-
-## Architecture
-
-```
-Agent (Claude) --> MCP Server (Railway) --> Edge Function (Supabase) --> PostgreSQL
-```
-
-The MCP server translates tool calls into HTTP requests to a Supabase Edge Function, which handles all database operations using the service role.
+MIT
