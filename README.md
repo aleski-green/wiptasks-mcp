@@ -38,6 +38,28 @@ This MCP server gives AI agents (Claude, etc.) direct access to your WipTasks da
 | `created_at` | timestamp | Auto-set on creation |
 | `updated_at` | timestamp | Auto-updated on changes |
 
+## Authentication
+
+All `/mcp` requests require a bearer token. Set `MCP_SECRET` as an environment variable on your server, then pass it in the `Authorization` header:
+
+```
+Authorization: Bearer <your-MCP_SECRET>
+```
+
+Requests without a valid token receive `401 Unauthorized`. The `/health` endpoint remains open.
+
+## Connect to Claude Web App
+
+1. Go to **Settings** > **Connectors**
+2. Click **Add Connector**
+3. Fill in:
+   - **Name:** `WipTasksMCP`
+   - **URL:** `https://<your-railway-url>/mcp`
+   - **Authentication type:** Custom Header
+   - **Header name:** `Authorization`
+   - **Header value:** `Bearer <your-MCP_SECRET>`
+4. Save
+
 ## Connect to Claude Code
 
 Add to `.mcp.json` in your project root:
