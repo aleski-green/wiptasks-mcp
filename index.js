@@ -151,6 +151,21 @@ function createServer() {
 const app = express();
 app.use(express.json());
 
+// Bearer token auth — protects all /mcp routes
+const MCP_SECRET = process.env.MCP_SECRET;
+if (!MCP_SECRET) {
+  console.error("MCP_SECRET env var is required");
+  process.exit(1);
+}
+
+app.use("/mcp", (req, res, next) => {
+  const auth = req.headers["authorization"];
+  if (auth !== `Bearer ${MCP_SECRET}`) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  next();
+});
+
 // Store transports by session ID
 const transports = new Map();
 

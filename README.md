@@ -6,12 +6,6 @@ Remote MCP (Model Context Protocol) server for managing WipTasks — a task mana
 
 This MCP server gives AI agents (Claude, etc.) direct access to your WipTasks database. Agents can create, read, update, complete, and archive tasks without needing to interact with any UI.
 
-## Live Endpoint
-
-- **MCP URL:** `https://empathetic-analysis-production-dd14.up.railway.app/mcp`
-- **Health:** `https://empathetic-analysis-production-dd14.up.railway.app/health`
-- **Protocol:** Streamable HTTP (MCP standard)
-
 ## Available Tools
 
 | Tool | Description |
@@ -53,7 +47,10 @@ Add to `.mcp.json` in your project root:
   "mcpServers": {
     "wiptasks": {
       "type": "url",
-      "url": "https://empathetic-analysis-production-dd14.up.railway.app/mcp"
+      "url": "https://<your-railway-url>/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-MCP_SECRET>"
+      }
     }
   }
 }
@@ -70,7 +67,10 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
   "mcpServers": {
     "wiptasks": {
       "type": "url",
-      "url": "https://empathetic-analysis-production-dd14.up.railway.app/mcp"
+      "url": "https://<your-railway-url>/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-MCP_SECRET>"
+      }
     }
   }
 }
@@ -82,6 +82,7 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 2. Set environment variables:
    - `SUPABASE_URL` — your Supabase project URL
    - `SUPABASE_KEY` — your Supabase anon or service_role key
+   - `MCP_SECRET` — a random secret string for bearer auth
    - `PORT` — server port (default: 3000)
 3. `npm install && npm start`
 
